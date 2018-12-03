@@ -1,0 +1,78 @@
+STEP 8 - DEPLOYING APP ON SPARK-HDFS CLUSTER
+
+0.Prepare Docker and yml files
+
+0.1. Change Dockerfile to have text files to read in specific folder. Here is the fullcontemt of Dockerfile:
+
+FROM mjhea0/spark
+RUN mkdir /data/
+ADD Montreal2.txt /data/
+ADD Montreal.csv /data/
+
+0.2. Change docker-compose-hdfs.yml:
+
+services:
+
+	master:
+		image: spark-montreal
+	......
+	worker:
+		image: spark-montreal
+	......
+
+1. Download GitHub repo with dockerfile and yml files
+https://github.com/CCE-BigData/spark-docker-swarm
+2. Open terminal from this folder on your pc
+3. Build new image called "spark-montreal"
+docker build -t spark-montreal .
+4. Start Spark cluster
+docker stack deploy --compose-file=docker-compose-hdfs.yml spark
+5. Increase the number of Spark Workers to 2:
+docker service scale spark_worker=2
+6. List the deployed services: docker service ls
+Check http://localhost:8080/ to see that there is indeed now 2 Registered Spark Workers.
+
+The PySpark script to deploy: EDA.py (we have to ensure first that in py code the path for file to read is "/data/Montreal.csv")
+
+7. Get container ID and run EDA.py inside of it
+ 
+export CONTAINER_ID=$(docker ps --filter name=master --format "{{.ID}}")
+
+docker cp EDA.py $CONTAINER_ID:/tmp
+
+docker exec $CONTAINER_ID \
+  bin/spark-submit \
+    --master spark://master:7077 \
+    --class endpoint \
+    /tmp/EDA.py
+
+Explore the Applications on http://localhost:8080/
+
+8. To be able to explore data on HDFS, inside EDA.py you have to save your output as:
+
+    hdfs = "hdfs://hadoop:8020/"
+    ## Writing file in CSV format
+    df_final.write.format("com.databricks.spark.csv").mode("overwrite").option("header", "true").save(hdfs + "user/me/eda.csv")
+
+
+8.1 To have a look at the content of the saved files on HDFS: 
+docker exec -it $(docker ps --filter name=master --format "{{.ID}}") hdfs dfs -cat hdfs://hadoop:8020/user/me/eda.csv/part*
+
+8.2 To browse the files on HDFS: http://localhost:50070 -> "Utilities/Browse the file system" 
+(see screenshot attached)
+
+9. Stop running containers
+
+docker stop $(docker ps -a -q)
+
+10. Stop Spark cluster
+
+sudo docker stack down spark
+
+11. Remove containers 
+
+docker rm $(docker ps -a -q)
+
+11*. Forced remove (in case)
+
+docker rm -vf $(docker ps -a -q)

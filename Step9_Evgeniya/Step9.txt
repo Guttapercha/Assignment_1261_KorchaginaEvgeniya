@@ -1,0 +1,110 @@
+STEP 9 - MongoDB (extending step8)
+
+0. Change file EDA.py by adding/replacing:
+
+reading from and writing to parts to appropriate codings
+
+1. copy inside lcal working folder 'spark-docker-swarm' files:
+
+mongo.py
+stack-jupyter.yml
+stack-spark-mongodb.yml
+Read_from_MongoDB.ipynb
+
+from https://github.com/CCE-BigData/CEBD-1261/tree/master/step_09
+
+2.Change stack-spark-mongodb.yml:
+
+services:
+
+	master:
+		image: spark-montreal
+	......
+	worker:
+		image: spark-montreal
+	......
+
+3.To deploy the stack-spark-mongodb.yml Stack:
+
+docker stack deploy -c stack-spark-mongodb.yml spark_cluster
+
+docker service scale spark_cluster_worker=2
+
+4. To copy & execute the EDA2.py Script:
+
+export CONTAINER_ID=$(docker ps --filter name=master --format "{{.ID}}")
+
+docker cp EDA2.py $CONTAINER_ID:/tmp
+
+docker exec $CONTAINER_ID \
+  bin/spark-submit \
+    --master spark://master:7077 \
+    --class endpoint \
+    --packages org.mongodb.spark:mongo-spark-connector_2.11:2.3.1 \
+    /tmp/EDA2.py
+
+5.To interact with Spark & MongoDB:
+
+docker exec -it $(docker ps --filter name=master --format "{{.ID}}") bin/pyspark \
+  --conf "spark.mongodb.input.uri=mongodb://root:example@mongo/test.coll?authSource=admin&readPreference=primaryPreferred" \
+  --conf "spark.mongodb.output.uri=mongodb://root:example@mongo/test.coll?authSource=admin" \
+  --packages org.mongodb.spark:mongo-spark-connector_2.11:2.3.1
+
+Open http://localhost:8181
+
+To view database: "Viewing Database: Test" -> Export
+
+6. To read from MongoDB in Jupyter:
+
+6.1. First (and only once), create a dedicated volume:
+
+docker volume create jupyter-data
+
+6.2 Then, deploy Jupyter into your cluster (first to change in stack-jupyter.yml image to latest version):
+
+docker stack deploy -c stack-jupyter.yml spark_cluster
+
+!!!!THIS STEP TAKES TIME!!!
+
+check
+
+docker ps
+
+8. Open http://localhost:8888
+ and fill with ptovided token 
+(To read Jupyter logs:
+docker service logs spark_claster_jupyter)
+
+9. Upload file Read_from_MongoDB.ipynb
+
+---> I will be reading from your data saved on MongoDB
+
+10. Add the HDFS feature to your current Spark Cluster
+
+add to file stack-spark-mongodb.yml from file docker-compose-hdfs.yml part with hadoop settings
+
+add into file EDA2.py saving to hdfs part (like in step8)
+copy EDA2.py again, run and check again result using:
+ 
+either (to have a look at the content of the saved files on HDFS):
+ 
+docker exec -it $(docker ps --filter name=master --format "{{.ID}}") hdfs dfs -cat hdfs://hadoop:8020/user/me/eda.csv/part*
+
+or to browse the files on HDFS: http://localhost:50070 -> "Utilities/Browse the file system" 
+(see screenshot attached)
+
+11. Stop running containers
+
+docker stop $(docker ps -a -q)
+
+12. Stop Spark cluster
+
+sudo docker stack down spark_cluster
+
+13. Remove containers 
+
+docker rm $(docker ps -a -q)
+
+13*. Forced remove (in case)
+
+docker rm -vf $(docker ps -a -q)

@@ -1,0 +1,16 @@
+Creating docker image:
+
+1. In GitHib repo create Dockerfile. In my case:
+
+FROM python:3
+RUN pip3 install jupyter
+RUN pip3 install pandas
+RUN pip3 install numpy
+EXPOSE 80 8888 5000
+ADD EDA.ipynb /eda/
+ADD MontrealAirB&B.csv /eda/
+WORKDIR /eda
+CMD [ "python", "/eda/EDA.ipynb" ]
+
+2. In Hub Docker: Create->Create Automated pull-> choose gitHib folder with Docker file - "Guttapercha/EDA" (it will be automatically pulled)
+3.One status of Build Details says success, image is build and one can move to further steps -> 7,8,9
